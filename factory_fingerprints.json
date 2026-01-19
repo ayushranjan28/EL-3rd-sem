@@ -1,0 +1,137 @@
+{
+    "CH-1": {
+        "type": "Chemical",
+        "normalized": {
+            "location_km_from_origin": 0.3255066969064376,
+            "flow_rate_m3ph": 0.4263742539503095,
+            "turbidity_ntu": 0.36179433710885284,
+            "ph": 0.4351032863849765,
+            "conductivity_us_cm": 0.5107881448428943,
+            "temperature_c": 0.6021303552748315,
+            "chromium_mg_l": 0.5143514811849479,
+            "copper_mg_l": 0.5127211436833967,
+            "tds_mg_l": 0.4892436107920088,
+            "uv_vis_absorbance": 0.44322080080194565
+        },
+        "raw": {
+            "location_km_from_origin": 12.0,
+            "flow_rate_m3ph": 230.38031690140843,
+            "turbidity_ntu": 217.65728169014088,
+            "ph": 5.915929577464789,
+            "conductivity_us_cm": 3747.2330633802817,
+            "temperature_c": 35.060859154929574,
+            "chromium_mg_l": 1.28485,
+            "copper_mg_l": 0.6154528169014084,
+            "tds_mg_l": 3228.4277183098593,
+            "uv_vis_absorbance": 1.8657654929577465
+        }
+    },
+    "CH-2": {
+        "type": "Chemical",
+        "normalized": {
+            "location_km_from_origin": 0.8584186137594124,
+            "flow_rate_m3ph": 0.44304414622128496,
+            "turbidity_ntu": 0.3641078400379612,
+            "ph": 0.4422837315669111,
+            "conductivity_us_cm": 0.501837469578531,
+            "temperature_c": 0.5985247457533839,
+            "chromium_mg_l": 0.5060988464298762,
+            "copper_mg_l": 0.4955048257247491,
+            "tds_mg_l": 0.49450630630850617,
+            "uv_vis_absorbance": 0.43512914606246
+        },
+        "raw": {
+            "location_km_from_origin": 30.0,
+            "flow_rate_m3ph": 238.21416607523068,
+            "turbidity_ntu": 219.0426259758694,
+            "ph": 5.980553584102201,
+            "conductivity_us_cm": 3684.199900638751,
+            "temperature_c": 34.970787792760824,
+            "chromium_mg_l": 1.264234918381831,
+            "copper_mg_l": 0.5947998580553584,
+            "tds_mg_l": 3262.072611781405,
+            "uv_vis_absorbance": 1.8318857345635202
+        }
+    },
+    "TX-A": {
+        "type": "Textile",
+        "normalized": {
+            "location_km_from_origin": 0.20708182649466542,
+            "flow_rate_m3ph": 0.43068156441678185,
+            "turbidity_ntu": 0.5660530368897354,
+            "ph": 0.6702957240948814,
+            "conductivity_us_cm": 0.35077507840699396,
+            "temperature_c": 0.4959212957492912,
+            "chromium_mg_l": 0.20016603170176586,
+            "copper_mg_l": 0.21602560603067664,
+            "tds_mg_l": 0.33542194824869553,
+            "uv_vis_absorbance": 0.2804222137541829
+        },
+        "raw": {
+            "location_km_from_origin": 8.0,
+            "flow_rate_m3ph": 232.40449438202248,
+            "turbidity_ntu": 339.9690449438202,
+            "ph": 8.032661516853933,
+            "conductivity_us_cm": 2620.3762219101127,
+            "temperature_c": 32.407661516853935,
+            "chromium_mg_l": 0.5000147471910112,
+            "copper_mg_l": 0.25953230337078653,
+            "tds_mg_l": 2245.0317696629213,
+            "uv_vis_absorbance": 1.1841278089887641
+        }
+    },
+    "TX-B": {
+        "type": "Textile",
+        "normalized": {
+            "location_km_from_origin": 0.41432534971526674,
+            "flow_rate_m3ph": 0.4195900954733882,
+            "turbidity_ntu": 0.5616768825588915,
+            "ph": 0.6742740037334632,
+            "conductivity_us_cm": 0.3515858934952952,
+            "temperature_c": 0.4983182005087894,
+            "chromium_mg_l": 0.1965446718221911,
+            "copper_mg_l": 0.21434943971722936,
+            "tds_mg_l": 0.33249213720596166,
+            "uv_vis_absorbance": 0.2893588855414067
+        },
+        "raw": {
+            "location_km_from_origin": 15.0,
+            "flow_rate_m3ph": 227.19216946676408,
+            "turbidity_ntu": 337.34856829802777,
+            "ph": 8.068466033601169,
+            "conductivity_us_cm": 2626.0862089116144,
+            "temperature_c": 32.467538349159966,
+            "chromium_mg_l": 0.4909685902118334,
+            "copper_mg_l": 0.25752154857560267,
+            "tds_mg_l": 2226.3012198685174,
+            "uv_vis_absorbance": 1.22154565376187
+        }
+    },
+    "TX-C": {
+        "type": "Textile",
+        "normalized": {
+            "location_km_from_origin": 0.7103875257446971,
+            "flow_rate_m3ph": 0.42638145799973176,
+            "turbidity_ntu": 0.5719763642195381,
+            "ph": 0.6656218547807333,
+            "conductivity_us_cm": 0.3586523659435268,
+            "temperature_c": 0.5025599507846383,
+            "chromium_mg_l": 0.20107905159497833,
+            "copper_mg_l": 0.2171040526344984,
+            "tds_mg_l": 0.3356283714712379,
+            "uv_vis_absorbance": 0.2759128980410249
+        },
+        "raw": {
+            "location_km_from_origin": 25.0,
+            "flow_rate_m3ph": 230.38370237239394,
+            "turbidity_ntu": 343.5159813084112,
+            "ph": 7.9905966930266,
+            "conductivity_us_cm": 2675.850287562904,
+            "temperature_c": 32.57350107836089,
+            "chromium_mg_l": 0.502295470884256,
+            "copper_mg_l": 0.2608260244428469,
+            "tds_mg_l": 2246.3514521926672,
+            "uv_vis_absorbance": 1.1652473040977713
+        }
+    }
+}

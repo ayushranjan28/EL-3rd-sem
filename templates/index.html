@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Industry Pollution Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <!-- Input Form Section -->
+        <div class="card">
+            <h1>CHEMICAL BACKTRACKING</h1>
+            <div class="tabs">
+                <div class="tab active" onclick="switchTab('prediction')">Violation Predictor</div>
+                <div class="tab" onclick="switchTab('backtracking')">Source Identifier</div>
+            </div>
+
+            <!-- Violation Prediction Form -->
+            <div id="predictionTab" class="tab-content active">
+                <form id="predictionForm">
+                    <div class="form-group">
+                        <label for="factory_id">Factory ID</label>
+                        <input type="text" id="factory_id" name="factory_id" value="TX-A">
+                    </div>
+
+
+
+                    <div class="form-group">
+                        <label for="location_km_from_origin">Location (km from origin)</label>
+                        <input type="number" step="0.0001" id="location_km_from_origin" name="location_km_from_origin"
+                            required value="15.5">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="flow_rate_m3ph">Flow Rate (m³/h)</label>
+                        <input type="number" step="0.0001" id="flow_rate_m3ph" name="flow_rate_m3ph" required
+                            value="350">
+                    </div>
+
+                    <!-- Shared Chemical Params -->
+                    <div class="form-group">
+                        <label>Turbidity (NTU)</label>
+                        <input type="number" step="0.0001" name="turbidity_ntu" required value="4.2">
+                    </div>
+                    <div class="form-group">
+                        <label>pH Level</label>
+                        <input type="number" step="0.0001" name="ph" required value="7.2">
+                    </div>
+                    <div class="form-group">
+                        <label>Conductivity (µS/cm)</label>
+                        <input type="number" step="0.0001" name="conductivity_us_cm" required value="1200">
+                    </div>
+                    <div class="form-group">
+                        <label>Temperature (°C)</label>
+                        <input type="number" step="0.0001" name="temperature_c" required value="28.5">
+                    </div>
+                    <div class="form-group">
+                        <label>Chromium (mg/L)</label>
+                        <input type="number" step="0.0001" name="chromium_mg_l" required value="0.05">
+                    </div>
+                    <div class="form-group">
+                        <label>Copper (mg/L)</label>
+                        <input type="number" step="0.0001" name="copper_mg_l" required value="0.02">
+                    </div>
+                    <div class="form-group">
+                        <label>TDS (mg/L)</label>
+                        <input type="number" step="0.0001" name="tds_mg_l" required value="800">
+                    </div>
+
+                    <button type="submit">Predict Pollution Level</button>
+                </form>
+            </div>
+
+            <!-- Source Backtracking Form -->
+            <div id="backtrackingTab" class="tab-content">
+                <form id="backtrackingForm">
+                    <p style="margin-bottom: 20px; color: #94a3b8; font-size: 0.9rem;">
+                        Enter measured water parameters to identify the likely industrial source type based on chemical
+                        signatures.
+                    <div class="form-group">
+                        <label>Location (km from origin)</label>
+                        <input type="number" step="0.0001" name="location_km_from_origin" required value="8.0">
+                    </div>
+                    <div class="form-group">
+                        <label>Flow Rate (m³/h)</label>
+                        <input type="number" step="0.0001" name="flow_rate_m3ph" required value="100.0">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Turbidity (NTU)</label>
+                        <input type="number" step="0.0001" name="turbidity_ntu" required value="85.0">
+                    </div>
+                    <div class="form-group">
+                        <label>pH Level</label>
+                        <input type="number" step="0.0001" name="ph" required value="5.2">
+                    </div>
+                    <div class="form-group">
+                        <label>Conductivity (µS/cm)</label>
+                        <input type="number" step="0.0001" name="conductivity_us_cm" required value="1800">
+                    </div>
+                    <div class="form-group">
+                        <label>Temperature (°C)</label>
+                        <input type="number" step="0.0001" name="temperature_c" required value="38.4">
+                    </div>
+                    <div class="form-group">
+                        <label>Chromium (mg/L)</label>
+                        <input type="number" step="0.0001" name="chromium_mg_l" required value="0.024">
+                    </div>
+                    <div class="form-group">
+                        <label>Copper (mg/L)</label>
+                        <input type="number" step="0.0001" name="copper_mg_l" required value="0.369">
+                    </div>
+                    <div class="form-group">
+                        <label>TDS (mg/L)</label>
+                        <input type="number" step="0.0001" name="tds_mg_l" required value="1233">
+                    </div>
+                    <div class="form-group">
+                        <label>UV-Vis Absorbance</label>
+                        <input type="number" step="0.0001" name="uv_vis_absorbance" required value="1.9">
+                    </div>
+
+                    <button type="submit" style="background: linear-gradient(to right, #f59e0b, #ef4444);">Analyze
+                        Source</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div class="card result-card">
+            <h2>Analysis Result</h2>
+
+            <div id="loader" class="loader"></div>
+
+            <div id="resultPlaceholder" class="result-placeholder">
+                <p>Enter parameters and perform analysis to see results.</p>
+            </div>
+
+            <!-- Prediction Result -->
+            <div id="predictionResult" class="result-content">
+                <div class="status-indicator">
+                    <div id="predIcon" class="status-icon">✅</div>
+                    <div id="predStatus" class="status-text status-safe">Safe</div>
+                </div>
+
+                <div class="detail-row">
+                    <span class="detail-label">Violation Score:</span>
+                    <span id="violationScore" class="detail-value">0.12</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Alert Level:</span>
+                    <span id="alertLevel" class="detail-value">Low</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Timestamp:</span>
+                    <span id="resultTimestamp" class="detail-value">--</span>
+                </div>
+            </div>
+
+            <!-- Backtracking Result -->
+            <div id="backtrackingResult" class="result-content">
+                <div class="status-indicator">
+                    <div class="status-icon">🏭</div>
+                    <div id="sourceType" class="status-text" style="color: var(--primary-color);">Unknown</div>
+                    <div id="sourceText" style="color: #94a3b8; font-size: 0.9rem; margin-top: 5px;">Most Probable
+                        Source</div>
+                </div>
+
+                <div class="chart-container">
+                    <canvas id="radarChart"></canvas>
+                </div>
+
+                <div class="chart-container" style="margin-top: 20px;">
+                    <canvas id="barChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart Config -->
+    <script>
+        let radarChart = null;
+        let barChart = null;
+
+        function updateCharts(data) {
+            const analysis = data.fingerprint_analysis;
+
+            // Prepare Data for Radar Chart (Input vs Top Match Fingerprint)
+            const features = Object.keys(analysis.input_raw);
+            const inputValues = Object.values(analysis.input_raw);
+            const fingerprintValues = features.map(f => analysis.fingerprint_raw[f]);
+
+            // Radar Chart
+            const ctxRadar = document.getElementById('radarChart').getContext('2d');
+            if (radarChart) radarChart.destroy();
+
+            radarChart = new Chart(ctxRadar, {
+                type: 'radar',
+                data: {
+                    labels: features.map(f => f.replace(/_/g, ' ').replace(' ntu', '').replace(' mg l', '').replace(' us cm', '')),
+                    datasets: [{
+                        label: 'Input Signature',
+                        data: inputValues,
+                        fill: true,
+                        backgroundColor: 'rgba(79, 172, 254, 0.2)',
+                        borderColor: 'rgb(79, 172, 254)',
+                        pointBackgroundColor: 'rgb(79, 172, 254)',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: 'rgb(79, 172, 254)'
+                    }, {
+                        label: `${analysis.most_probable} Fingerprint`,
+                        data: fingerprintValues,
+                        fill: true,
+                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                        borderColor: 'rgb(255, 99, 132)',
+                        pointBackgroundColor: 'rgb(255, 99, 132)',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: 'rgb(255, 99, 132)'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        r: {
+                            angleLines: { color: 'rgba(255, 255, 255, 0.1)' },
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            pointLabels: { color: '#94a3b8' },
+                            ticks: { display: false }
+                        }
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#e2e8f0' } }
+                    }
+                }
+            });
+
+            // Bar Chart (Top 5 Probabilities)
+            const ctxBar = document.getElementById('barChart').getContext('2d');
+            if (barChart) barChart.destroy();
+
+            // Sort factories by probability descending and take top 5
+            const sortedParams = Object.entries(analysis.probabilities)
+                .sort(([, a], [, b]) => b - a)
+                .slice(0, 5);
+
+            const factories = sortedParams.map(([k]) => k);
+            const probs = sortedParams.map(([, v]) => (v * 100).toFixed(1));
+
+            barChart = new Chart(ctxBar, {
+                type: 'bar',
+                data: {
+                    labels: factories,
+                    datasets: [{
+                        label: 'Probability Match (%)',
+                        data: probs,
+                        backgroundColor: [
+                            'rgba(255, 99, 132, 0.6)',
+                            'rgba(54, 162, 235, 0.6)',
+                            'rgba(255, 206, 86, 0.6)',
+                            'rgba(75, 192, 192, 0.6)',
+                            'rgba(153, 102, 255, 0.6)'
+                        ],
+                        borderColor: [
+                            'rgba(255, 99, 132, 1)',
+                            'rgba(54, 162, 235, 1)',
+                            'rgba(255, 206, 86, 1)',
+                            'rgba(75, 192, 192, 1)',
+                            'rgba(153, 102, 255, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    indexAxis: 'y',
+                    scales: {
+                        x: {
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                        },
+                        y: {
+                            ticks: { color: '#94a3b8' },
+                            grid: { display: false }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+    </script>
+
+    <script>
+        function switchTab(tabName) {
+            // Update tabs
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelector(`.tab[onclick="switchTab('${tabName}')"]`).classList.add('active');
+
+            // Update content
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.getElementById(`${tabName}Tab`).classList.add('active');
+
+            // Reset results
+            document.getElementById('resultPlaceholder').style.display = 'block';
+            document.querySelectorAll('.result-content').forEach(c => c.style.display = 'none');
+        }
+
+        // Helper to gather form data
+        function getFormData(formId) {
+            const formData = new FormData(document.getElementById(formId));
+            const data = {};
+            formData.forEach((value, key) => {
+                if (!['factory_id'].includes(key)) {
+                    data[key] = parseFloat(value);
+                } else {
+                    data[key] = value;
+                }
+            });
+            return data;
+        }
+
+        // Prediction Form Handler
+        document.getElementById('predictionForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const loader = document.getElementById('loader');
+            const placeholder = document.getElementById('resultPlaceholder');
+            const content = document.getElementById('predictionResult');
+            const otherContent = document.getElementById('backtrackingResult');
+
+            loader.style.display = 'block';
+            placeholder.style.display = 'none';
+            content.style.display = 'none';
+            otherContent.style.display = 'none';
+
+            try {
+                const data = getFormData('predictionForm');
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    const pred = result.prediction;
+                    const violation = pred.ai_prediction == 1;
+
+                    const statusText = document.getElementById('predStatus');
+                    const statusIcon = document.getElementById('predIcon');
+
+                    // Handle alert_level which comes as 'alert_level' in predict_single
+                    const alertLevel = (pred.alert_level || pred.ai_alert_level || 'low').toLowerCase();
+
+                    if (alertLevel === 'low') {
+                        statusText.textContent = "WITHIN LIMITS";
+                        statusText.className = "status-text status-safe";
+                        statusIcon.textContent = "✅";
+                    } else {
+                        statusText.textContent = alertLevel.toUpperCase();
+                        statusText.className = "status-text status-danger";
+                        statusIcon.textContent = "❌";
+                    }
+
+                    // Use correct property name from predict_single
+                    const score = pred.violation_probability !== undefined ? pred.violation_probability : pred.ai_violation_score;
+                    document.getElementById('violationScore').textContent = score.toFixed(4);
+
+                    // Handle alert_level which comes as 'alert_level' in predict_single
+                    document.getElementById('alertLevel').textContent = pred.alert_level || pred.ai_alert_level;
+                    document.getElementById('resultTimestamp').textContent = new Date().toLocaleTimeString();
+
+                    content.style.display = 'block';
+                } else {
+                    alert('Error: ' + result.error);
+                    placeholder.style.display = 'block';
+                }
+            } catch (error) {
+                alert('Error: ' + error);
+                placeholder.style.display = 'block';
+            } finally {
+                loader.style.display = 'none';
+            }
+        });
+
+        // Backtracking Form Handler
+        document.getElementById('backtrackingForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const loader = document.getElementById('loader');
+            const placeholder = document.getElementById('resultPlaceholder');
+            const content = document.getElementById('backtrackingResult');
+            const otherContent = document.getElementById('predictionResult');
+
+            loader.style.display = 'block';
+            placeholder.style.display = 'none';
+            content.style.display = 'none';
+            otherContent.style.display = 'none';
+
+            try {
+                const data = getFormData('backtrackingForm');
+                const response = await fetch('/traceback', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    const analysis = result.fingerprint_analysis;
+
+                    // Display ID and Type if available (using the type map implied by metadata)
+                    // Note: Backend 'most_probable' is now the Factory ID
+                    const factoryId = analysis.most_probable;
+                    // To get the type, we might need to look it up in the raw fingerprints if passed, 
+                    // or just rely on the ID if the backend didn't pass explicit type mapping in the top level.
+                    // However, I updated generate_fingerprints to save 'type' in fingerprints.
+                    // So analysis.fingerprint_raw should contain it if I accessed it right, 
+                    // but analysis.fingerprint_raw is just the centroids data usually.
+
+                    // Actually, I can get the type from the fingerprint info itself
+                    // analysis.fingerprints[factoryId].type if the full structure was returned.
+                    // But wait, 'api_server' returns the result of 'trace_source' which returns 'fingerprint_analysis'.
+                    // 'fingerprint_analysis' has 'fingerprint_raw' which is just 'self.fingerprints[top_match]['raw']'.
+                    // It doesn't include the 'type' field I added to the JSON root for that key.
+
+                    // Let's rely on the fact that I added 'type' key to the fingerprint object in generate_fingerprints.
+                    // But 'fingerprint_raw' in 'PollutionTracer.calculate_fingerprint_match' returns:
+                    // 'fingerprint_raw': self.fingerprints[top_match]['raw']
+                    // This corresponds to 'centroids_raw.loc[factory_id]'. It does NOT include the sibling 'type' key I added.
+
+                    // I'll just clear this up by using the ID for now, and maybe the user is happy with just "TX-A".
+                    // Wait, "TX-A" IS the ID. The user asked "point out the exact factory its from like TX-A".
+                    // So showing "TX-A" is exactly what is needed.
+
+                    document.getElementById('sourceType').textContent = factoryId;
+                    document.getElementById('sourceText').textContent = `Based on chemical analysis, the specific factory identified is ${factoryId}.`;
+
+                    updateCharts(result);
+
+                    content.style.display = 'block';
+                } else {
+                    alert('Error: ' + result.error);
+                    placeholder.style.display = 'block';
+                }
+            } catch (error) {
+                alert('Error: ' + error);
+                placeholder.style.display = 'block';
+            } finally {
+                loader.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+
+</html>
