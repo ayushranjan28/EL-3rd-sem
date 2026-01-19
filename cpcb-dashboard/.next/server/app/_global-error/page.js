@@ -1,0 +1,11 @@
+var R=require("../../chunks/ssr/[turbopack]_runtime.js")("server/app/_global-error/page.js")
+R.c("server/chunks/ssr/[root-of-the-server]__3235f50b._.js")
+R.c("server/chunks/ssr/cpcb-dashboard_5b6a7446._.js")
+R.c("server/chunks/ssr/dc816_next_dist_4680bc9f._.js")
+R.c("server/chunks/ssr/[root-of-the-server]__cad0dccc._.js")
+R.c("server/chunks/ssr/dc816_5550d51b._.js")
+R.c("server/chunks/ssr/dc816_next_dist_1af4e5c2._.js")
+R.c("server/chunks/ssr/cpcb-dashboard_src_app_f679af39._.js")
+R.c("server/chunks/ssr/cpcb-dashboard__next-internal_server_app__global-error_page_actions_ce35fd97.js")
+R.m(2138)
+module.exports=R.m(2138).exports

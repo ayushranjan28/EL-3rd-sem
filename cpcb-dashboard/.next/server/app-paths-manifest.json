@@ -1,0 +1,16 @@
+{
+  "/_global-error/page": "app/_global-error/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/alerts/page": "app/alerts/page.js",
+  "/api/ai-check/route": "app/api/ai-check/route.js",
+  "/api/alerts/alerts/route": "app/api/alerts/alerts/route.js",
+  "/api/alerts/route": "app/api/alerts/route.js",
+  "/api/auth/login/route": "app/api/auth/login/route.js",
+  "/api/csv-info/route": "app/api/csv-info/route.js",
+  "/api/init-db/route": "app/api/init-db/route.js",
+  "/api/predict/route": "app/api/predict/route.js",
+  "/dashboard/page": "app/dashboard/page.js",
+  "/favicon.ico/route": "app/favicon.ico/route.js",
+  "/login/page": "app/login/page.js",
+  "/page": "app/page.js"
+}
