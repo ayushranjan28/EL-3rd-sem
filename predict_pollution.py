@@ -1,12 +1,13 @@
 """
-Real-time Pollution Violation Prediction API
-Fast inference using trained Random Forest model
+Real-time Pollution Violation Prediction and Source Tracing API
+Fast inference using trained Random Forest models
 """
 
 import pandas as pd
 import numpy as np
 import joblib
 import json
+import math
 from datetime import datetime
 
 class PollutionPredictor:
@@ -14,7 +15,7 @@ class PollutionPredictor:
     
     def __init__(self):
         """Load trained model and encoders"""
-        print("Loading AI model...")
+        print("Loading Pollution Prediction AI model...")
         self.model = joblib.load('pollution_model.pkl')
         self.factory_encoder = joblib.load('factory_encoder.pkl')
         self.factory_type_encoder = joblib.load('factory_type_encoder.pkl')
@@ -22,30 +23,12 @@ class PollutionPredictor:
         with open('model_metadata.json', 'r') as f:
             self.metadata = json.load(f)
         
-        print(f"✓ Model loaded (Accuracy: {self.metadata['accuracy']*100:.2f}%)")
-        print(f"✓ Ready for predictions!\n")
+        print(f"[OK] Pollution Model loaded (Accuracy: {self.metadata['accuracy']*100:.2f}%)")
+        print(f"[OK] Ready for pollution predictions!\n")
     
     def predict_single(self, reading_data):
         """
         Predict violation for a single reading
-        
-        Args:
-            reading_data (dict): Dictionary with keys:
-                - factory_id: str (e.g., 'TX-B')
-                - factory_type: str ('Textile' or 'Chemical')
-                - location_km_from_origin: float
-                - flow_rate_m3ph: float
-                - turbidity_ntu: float
-                - ph: float
-                - conductivity_us_cm: float
-                - temperature_c: float
-                - chromium_mg_l: float
-                - copper_mg_l: float
-                - tds_mg_l: float
-                - timestamp: str (ISO format, optional)
-        
-        Returns:
-            dict: Prediction results with violation probability and classification
         """
         # Parse timestamp if provided
         if 'timestamp' in reading_data:
@@ -60,8 +43,20 @@ class PollutionPredictor:
         is_night = 1 if (hour >= 22 or hour <= 5) else 0
         
         # Encode categorical features
-        factory_id_encoded = self.factory_encoder.transform([reading_data['factory_id']])[0]
-        factory_type_encoded = self.factory_type_encoder.transform([reading_data['factory_type']])[0]
+        # Encode categorical features with fallback for unknown values
+        try:
+            factory_id_encoded = self.factory_encoder.transform([reading_data['factory_id']])[0]
+        except ValueError:
+            # Fallback to a known factory ID if unknown provided
+            factory_id_encoded = self.factory_encoder.transform([self.factory_encoder.classes_[0]])[0]
+            
+        # Default factory_type if not provided
+        f_type = reading_data.get('factory_type', self.factory_type_encoder.classes_[0])
+        try:
+            factory_type_encoded = self.factory_type_encoder.transform([f_type])[0]
+        except ValueError:
+            # Fallback
+            factory_type_encoded = self.factory_type_encoder.transform([self.factory_type_encoder.classes_[0]])[0]
         
         # Prepare features in correct order
         features = np.array([[
@@ -111,15 +106,7 @@ class PollutionPredictor:
         }
     
     def predict_batch(self, readings_df):
-        """
-        Predict violations for multiple readings
-        
-        Args:
-            readings_df (pd.DataFrame): DataFrame with required columns
-        
-        Returns:
-            pd.DataFrame: Original data with prediction columns added
-        """
+        """Predict violations for multiple readings"""
         df = readings_df.copy()
         
         # Feature engineering
@@ -129,6 +116,11 @@ class PollutionPredictor:
         
         # Encode
         df['factory_id_encoded'] = self.factory_encoder.transform(df['factory_id'])
+        
+        # Handle missing factory_type in batch
+        if 'factory_type' not in df.columns:
+            df['factory_type'] = self.factory_type_encoder.classes_[0]
+            
         df['factory_type_encoded'] = self.factory_type_encoder.transform(df['factory_type'])
         
         # Prepare features
@@ -156,87 +148,161 @@ class PollutionPredictor:
             return 'low'
 
 
-# Example usage and testing
+class PollutionTracer:
+    """Class to identify pollution sources based on chemical signatures"""
+    
+    def __init__(self):
+        """Load source identification model"""
+        print("Loading Source Identification AI model...")
+        try:
+            self.model = joblib.load('traceback_model.pkl')
+            self.factory_type_encoder = joblib.load('active_factory_type_encoder.pkl')
+            
+            with open('traceback_metadata.json', 'r') as f:
+                self.metadata = json.load(f)
+                
+            print(f"[OK] Tracer Model loaded (Accuracy: {self.metadata['accuracy']*100:.2f}%)")
+            self.features = self.metadata['features']
+            
+            # Load Fingerprints
+            with open('factory_fingerprints.json', 'r') as f:
+                self.fingerprints = json.load(f)
+            
+            with open('fingerprint_scaler.json', 'r') as f:
+                self.scaler_params = json.load(f)
+                
+        except Exception as e:
+            print(f"[ERROR] Failed to load tracer model or fingerprints: {e}")
+            self.model = None
+
+    def calculate_fingerprint_match(self, input_data):
+        """
+        Calculate probability based on Euclidean distance to factory centroids
+        """
+        if not hasattr(self, 'fingerprints'):
+            return None
+            
+        # Normalize input
+        features_to_norm = self.scaler_params['features']
+        normalized_input = {}
+        
+        # Min-Max Scaling: (x - min) / (max - min)
+        for i, feature in enumerate(features_to_norm):
+            if feature in input_data:
+                val = float(input_data[feature])
+                min_val = self.scaler_params['min'][i]
+                max_val = self.scaler_params['max'][i]
+                scale = self.scaler_params['scale'][i] # scale = 1 / (max - min)
+                
+                # Manual normalization using saved scaler params
+                norm_val = (val - min_val) * scale
+                normalized_input[feature] = norm_val
+        
+        distances = {}
+        
+        # Calculate Euclidean Distance
+        for factory, data in self.fingerprints.items():
+            centroid = data['normalized']
+            sum_sq_diff = 0
+            count = 0
+            
+            for feature in features_to_norm:
+                if feature in normalized_input and feature in centroid:
+                    diff = normalized_input[feature] - centroid[feature]
+                    sum_sq_diff += diff * diff
+                    count += 1
+            
+            if count > 0:
+                dist = math.sqrt(sum_sq_diff)
+                distances[factory] = dist
+        
+        # Convert distance to probability (Softmax-like using negative distance)
+        # P = exp(-dist) / sum(exp(-dist))
+        
+        exp_dists = {k: math.exp(-v) for k, v in distances.items()}
+        total_exp = sum(exp_dists.values())
+        
+        probabilities = {k: (v / total_exp) for k, v in exp_dists.items()}
+        
+        # Sort by probability
+        sorted_probs = dict(sorted(probabilities.items(), key=lambda item: item[1], reverse=True))
+        
+        # Get raw fingerprint data for the top match to display in radar chart
+        top_match = list(sorted_probs.keys())[0]
+        
+        return {
+            'probabilities': sorted_probs,
+            'most_probable': top_match,
+            'input_raw': {k: float(input_data[k]) for k in features_to_norm if k in input_data},
+            'fingerprint_raw': self.fingerprints[top_match]['raw'],
+            'all_fingerprints_raw': {k: v['raw'] for k, v in self.fingerprints.items()} # useful for multi-radar
+        }
+
+    def trace_source(self, reading_data):
+        """
+        Identify potential source factory type based on water parameters
+        """
+        if self.model is None:
+            return {'error': 'Model not loaded'}
+            
+        # Prepare feature vector ensuring all required features are present
+        features = []
+        missing_features = []
+        
+        for feature in self.features:
+            if feature in reading_data:
+                features.append(float(reading_data[feature]))
+            else:
+                missing_features.append(feature)
+        
+        if missing_features:
+            return {
+                'success': False,
+                'error': f'Missing features: {missing_features}'
+            }
+            
+        # Reshape for prediction
+        X = np.array([features])
+        
+        # Predict
+        prediction_idx = self.model.predict(X)[0]
+        probabilities = self.model.predict_proba(X)[0]
+        
+        predicted_class = self.factory_type_encoder.inverse_transform([prediction_idx])[0]
+        
+        # Get fingerprint analysis
+        fingerprint_analysis = self.calculate_fingerprint_match(reading_data)
+        
+        # Hybrid result (Model Prediction + Fingerprint Analysis)
+        
+        # Create confidence dictionary
+        confidence_scores = {}
+        for idx, prob in enumerate(probabilities):
+            class_name = self.factory_type_encoder.inverse_transform([idx])[0]
+            confidence_scores[class_name] = float(prob)
+            
+        return {
+            'success': True,
+            'predicted_source': predicted_class,
+            'confidence_scores': confidence_scores,
+            'fingerprint_analysis': fingerprint_analysis,
+            'top_confidence': float(max(probabilities))
+        }
+
+
 if __name__ == "__main__":
-    print("="*70)
-    print("POLLUTION VIOLATION PREDICTOR - DEMO")
-    print("="*70 + "\n")
-    
-    # Initialize predictor
-    predictor = PollutionPredictor()
-    
-    # Test case 1: Clean reading
-    print("Test 1: Clean Textile Factory Reading")
-    print("-" * 70)
-    clean_reading = {
-        'factory_id': 'TX-A',
-        'factory_type': 'Textile',
-        'location_km_from_origin': 8.0,
-        'flow_rate_m3ph': 250.0,
-        'turbidity_ntu': 85.0,
-        'ph': 7.2,
-        'conductivity_us_cm': 1200.0,
-        'temperature_c': 32.0,
-        'chromium_mg_l': 0.05,
-        'copper_mg_l': 0.08,
-        'tds_mg_l': 950.0,
-        'timestamp': '2026-01-06T14:30:00'
+    print("Running tests...")
+    # Test Tracer
+    tracer = PollutionTracer()
+    test_data = {
+        'turbidity_ntu': 300,
+        'ph': 4.0,
+        'conductivity_us_cm': 4000,
+        'temperature_c': 35,
+        'chromium_mg_l': 2.0,
+        'copper_mg_l': 0.5,
+        'tds_mg_l': 3000,
+        'uv_vis_absorbance': 2.5
     }
-    
-    result1 = predictor.predict_single(clean_reading)
-    print(f"Factory: {result1['factory_id']}")
-    print(f"Violation: {result1['is_violation']}")
-    print(f"Probability: {result1['violation_probability']:.3f}")
-    print(f"Alert Level: {result1['alert_level']}")
-    print(f"Reasons: {', '.join(result1['violation_reasons']) if result1['violation_reasons'] else 'None'}")
-    
-    # Test case 2: Violation reading
-    print("\n" + "="*70)
-    print("Test 2: Violation - High Chromium & TDS")
-    print("-" * 70)
-    violation_reading = {
-        'factory_id': 'CH-1',
-        'factory_type': 'Chemical',
-        'location_km_from_origin': 12.0,
-        'flow_rate_m3ph': 380.0,
-        'turbidity_ntu': 320.0,
-        'ph': 4.8,
-        'conductivity_us_cm': 4500.0,
-        'temperature_c': 38.0,
-        'chromium_mg_l': 1.8,
-        'copper_mg_l': 0.45,
-        'tds_mg_l': 3200.0,
-        'timestamp': '2026-01-06T14:30:00'
-    }
-    
-    result2 = predictor.predict_single(violation_reading)
-    print(f"Factory: {result2['factory_id']}")
-    print(f"Violation: {result2['is_violation']}")
-    print(f"Probability: {result2['violation_probability']:.3f}")
-    print(f"Alert Level: {result2['alert_level']}")
-    print(f"Reasons: {', '.join(result2['violation_reasons'])}")
-    
-    # Test case 3: Batch prediction
-    print("\n" + "="*70)
-    print("Test 3: Batch Prediction (Latest 5 readings from dataset)")
-    print("-" * 70)
-    
-    df = pd.read_csv('water_pollution_dataset.csv')
-    df_factory = df[df['is_baseline'] == 0].tail(5)
-    
-    results = predictor.predict_batch(df_factory)
-    
-    for idx, row in results.iterrows():
-        print(f"\n{row['factory_id']} @ {row['timestamp']}")
-        print(f"  AI Prediction: {'VIOLATION' if row['ai_prediction'] else 'COMPLIANT'}")
-        print(f"  Probability: {row['ai_violation_score']:.3f}")
-        print(f"  Alert Level: {row['ai_alert_level']}")
-    
-    print("\n" + "="*70)
-    print("✅ Predictor ready for production use!")
-    print("="*70)
-    print("\nIntegration tips:")
-    print("  • Average prediction time: <5ms per reading")
-    print("  • Use predict_single() for real-time API")
-    print("  • Use predict_batch() for bulk processing")
-    print("  • Model accuracy: {:.2f}%".format(predictor.metadata['accuracy'] * 100))
+    result = tracer.trace_source(test_data)
+    print("Trace Result:", result)
