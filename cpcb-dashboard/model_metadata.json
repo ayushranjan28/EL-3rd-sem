@@ -1,0 +1,35 @@
+{
+  "feature_columns": [
+    "factory_id_encoded",
+    "factory_type_encoded",
+    "location_km_from_origin",
+    "flow_rate_m3ph",
+    "turbidity_ntu",
+    "ph",
+    "conductivity_us_cm",
+    "temperature_c",
+    "chromium_mg_l",
+    "copper_mg_l",
+    "tds_mg_l",
+    "hour",
+    "day_of_week",
+    "is_night"
+  ],
+  "model_type": "RandomForestClassifier",
+  "accuracy": 0.9957234497505346,
+  "roc_auc": 0.995711222301644,
+  "training_date": "2026-01-06T17:38:08.057112",
+  "training_samples": 5610,
+  "test_samples": 1403,
+  "factories": [
+    "CH-1",
+    "CH-2",
+    "TX-A",
+    "TX-B",
+    "TX-C"
+  ],
+  "factory_types": [
+    "Chemical",
+    "Textile"
+  ]
+}
