@@ -1,8 +1,0 @@
-# AI API Configuration
-# Add this to your .env.local file in the cpcb-dashboard directory
-
-# AI Prediction API URL
-NEXT_PUBLIC_AI_API_URL=http://localhost:5000
-
-# Note: The API server must be running for predictions to work
-# Start it with: python api_server.py
