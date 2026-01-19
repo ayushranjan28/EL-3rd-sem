@@ -1,0 +1,20 @@
+{
+    "features": [
+        "location_km_from_origin",
+        "flow_rate_m3ph",
+        "turbidity_ntu",
+        "ph",
+        "conductivity_us_cm",
+        "temperature_c",
+        "chromium_mg_l",
+        "copper_mg_l",
+        "tds_mg_l",
+        "uv_vis_absorbance"
+    ],
+    "classes": [
+        "Chemical",
+        "Textile"
+    ],
+    "accuracy": 1.0,
+    "training_date": "2026-01-19T23:42:01.390245"
+}

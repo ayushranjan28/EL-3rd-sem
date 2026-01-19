@@ -3,10 +3,10 @@ Flask REST API for Water Pollution Violation Prediction
 Fast, lightweight API for dashboard integration
 """
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 import pandas as pd
-from predict_pollution import PollutionPredictor
+from predict_pollution import PollutionPredictor, PollutionTracer
 from datetime import datetime
 import traceback
 
@@ -16,8 +16,15 @@ CORS(app)  # Enable CORS for frontend integration
 # Initialize predictor (loads model once at startup)
 print("Initializing AI predictor...")
 predictor = PollutionPredictor()
-print("✓ API ready!\n")
+print("Initializing AI Tracer...")
+tracer = PollutionTracer()
+print("[OK] API ready!\n")
 
+
+@app.route('/')
+def index():
+    """Serve the prediction interface"""
+    return render_template('index.html')
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
@@ -53,7 +60,7 @@ def predict_violation():
         
         # Validate required fields
         required_fields = [
-            'factory_id', 'factory_type', 'location_km_from_origin',
+            'factory_id', 'location_km_from_origin',
             'flow_rate_m3ph', 'turbidity_ntu', 'ph', 'conductivity_us_cm',
             'temperature_c', 'chromium_mg_l', 'copper_mg_l', 'tds_mg_l'
         ]
@@ -143,6 +150,29 @@ def model_info():
         'success': True,
         'metadata': predictor.metadata
     })
+
+@app.route('/traceback', methods=['POST'])
+def trace_pollution_source():
+    """
+    Identify potential source of pollution (Chemical Signature Backtracking)
+    """
+    try:
+        data = request.get_json()
+        
+        # Check for required fields (handling partial data handled by class)
+        result = tracer.trace_source(data)
+        
+        if not result.get('success', False):
+             return jsonify(result), 400
+             
+        return jsonify(result)
+    
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
 
 @app.route('/factories', methods=['GET'])
 def get_factories():
