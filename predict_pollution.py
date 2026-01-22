@@ -80,29 +80,95 @@ class PollutionPredictor:
         prediction = self.model.predict(features)[0]
         probability = self.model.predict_proba(features)[0]
         
-        # Determine violation reasons based on thresholds
-        violations = []
-        if reading_data['turbidity_ntu'] > 200:
-            violations.append('turbidity_high')
-        if reading_data['ph'] < 5.5:
-            violations.append('ph_low')
-        elif reading_data['ph'] > 9.0:
-            violations.append('ph_high')
-        if reading_data['chromium_mg_l'] > 0.1:
-            violations.append('chromium_high')
-        if reading_data['copper_mg_l'] > 3.0:
-            violations.append('copper_high')
-        if reading_data['tds_mg_l'] > 2100:
-            violations.append('tds_high')
+        # =========================================================================
+        # HYBRID SCORING SYSTEM (AI + Physics)
+        # =========================================================================
         
+        # 1. Calculate Physical Severity Score (0.0 to 1.0)
+        severity_score = 0.0
+        details = []
+
+        # Weights (Toxic metals are more severe than physical params)
+        weights = {
+            'chromium': 0.35,  # 35% impact
+            'copper': 0.20,    # 20% impact
+            'ph': 0.20,        # 20% impact
+            'tds': 0.15,       # 15% impact
+            'turbidity': 0.10  # 10% impact
+        }
+
+        # -- Chromium Checking (Limit: 0.05) --
+        # 0.05-0.1 (Low), 0.1-0.2 (Mod), >0.2 (High)
+        val = reading_data['chromium_mg_l']
+        if val > 0.05:
+            # Normalize overflow: 0.05->0.0, 0.5->1.0
+            overflow = min((val - 0.05) / 0.45, 1.0) 
+            term_score = overflow * weights['chromium']
+            severity_score += term_score
+            level = "Critical" if val > 0.2 else "High" if val > 0.1 else "Elevated"
+            details.append(f"{level} Chromium ({val} mg/L)")
+
+        # -- Copper Checking (Limit: 1.5) --
+        val = reading_data['copper_mg_l']
+        if val > 1.5:
+            overflow = min((val - 1.5) / 2.0, 1.0)
+            severity_score += overflow * weights['copper']
+            details.append(f"High Copper ({val} mg/L)")
+
+        # -- pH Checking (Safe: 6.0 - 9.0) --
+        val = reading_data['ph']
+        if val < 6.0:
+            overflow = min((6.0 - val) / 3.0, 1.0) # Down to pH 3
+            severity_score += overflow * weights['ph']
+            details.append(f"Acidic pH ({val})")
+        elif val > 9.0:
+            overflow = min((val - 9.0) / 5.0, 1.0) # Up to pH 14
+            severity_score += overflow * weights['ph']
+            details.append(f"Alkaline pH ({val})")
+
+        # -- TDS Checking (Limit: 2100) --
+        val = reading_data['tds_mg_l']
+        if val > 2100:
+            overflow = min((val - 2100) / 2000, 1.0)
+            severity_score += overflow * weights['tds']
+            details.append(f"High TDS ({val} mg/L)")
+
+        # -- Turbidity Checking (Limit: 200) --
+        val = reading_data['turbidity_ntu']
+        if val > 200:
+            overflow = min((val - 200) / 300, 1.0)
+            severity_score += overflow * weights['turbidity']
+            details.append(f"High Turbidity ({val} NTU)")
+
+        # 2. Blend Scores
+        # If physically safe, force low score.
+        # Otherwise, blend AI Model (30%) + Physical Severity (70%)
+        # This allows the AI to influence borderline cases but respects physics for severe ones.
+        
+        ai_prob = float(probability[1])
+        
+        if len(details) == 0:
+            # COMPLETELY SAFE
+            final_prob = min(ai_prob, 0.15) # Cap at 15%
+        else:
+            # Has violations. Ensure it's at least 'Low' (0.2)
+            base_score = (ai_prob * 0.3) + (severity_score * 0.7)
+            # Boost score significantly if we have critical markers (like Chromium > 0.2)
+            if 'Critical' in str(details):
+                base_score = max(base_score, 0.92) # Force Critical
+            
+            final_prob = min(max(base_score, 0.25), 1.0) # Clamp 0.25 - 1.0
+
+        final_is_violation = final_prob > 0.25  # Threshold for "Safe" vs "Warning"
+
         return {
-            'is_violation': bool(prediction),
-            'violation_probability': float(probability[1]),
+            'is_violation': final_is_violation,
+            'violation_probability': final_prob,
             'confidence': float(max(probability)),
-            'violation_reasons': violations,
-            'alert_level': self._get_alert_level(probability[1]),
+            'violation_reasons': details,
+            'alert_level': self._get_alert_level(final_prob),
             'factory_id': reading_data['factory_id'],
-            'timestamp': reading_data.get('timestamp', datetime.now().isoformat())
+            'prediction_timestamp': datetime.now().isoformat()
         }
     
     def predict_batch(self, readings_df):
@@ -137,15 +203,22 @@ class PollutionPredictor:
         return df
     
     def _get_alert_level(self, probability):
-        """Determine alert level based on probability"""
-        if probability >= 0.8:
-            return 'critical'
-        elif probability >= 0.6:
-            return 'high'
-        elif probability >= 0.4:
-            return 'medium'
+        """
+        Determine alert level based on violation probability
+        Enhanced with 6 levels for better granularity
+        """
+        if probability >= 0.90:
+            return 'critical'      # 90-100%: Immediate action required
+        elif probability >= 0.75:
+            return 'severe'        # 75-90%: Urgent attention needed
+        elif probability >= 0.60:
+            return 'high'          # 60-75%: High risk, monitor closely
+        elif probability >= 0.40:
+            return 'moderate'      # 40-60%: Moderate risk, investigate
+        elif probability >= 0.20:
+            return 'low'           # 20-40%: Low risk, routine monitoring
         else:
-            return 'low'
+            return 'safe'          # 0-20%: Within acceptable limits
 
 
 class PollutionTracer:

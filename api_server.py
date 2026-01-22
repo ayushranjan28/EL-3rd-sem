@@ -9,8 +9,13 @@ import pandas as pd
 from predict_pollution import PollutionPredictor, PollutionTracer
 from datetime import datetime
 import traceback
+import os
 
-app = Flask(__name__)
+# Configure Flask to use templates and static files from cpcb-dashboard directory
+template_dir = os.path.join(os.path.dirname(__file__), 'cpcb-dashboard', 'templates')
+static_dir = os.path.join(os.path.dirname(__file__), 'cpcb-dashboard', 'static')
+
+app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
 CORS(app)  # Enable CORS for frontend integration
 
 # Initialize predictor (loads model once at startup)

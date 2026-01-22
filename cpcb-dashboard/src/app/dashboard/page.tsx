@@ -3,13 +3,12 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import SensorInputForm from '@/components/SensorInputForm';
 
 interface DashboardStats {
     totalAlerts: number;
     activeAlerts: number;
     resolvedAlerts: number;
-    violationRate: number;
+    resolutionRate: number;
     topViolators: Array<{ factory: string; count: number }>;
 }
 
@@ -27,8 +26,9 @@ export default function DashboardPage() {
             router.push('/login');
             return;
         }
-        setUser(JSON.parse(userData));
-        fetchDashboardData();
+        const parsedUser = JSON.parse(userData);
+        setUser(parsedUser);
+        fetchDashboardData(parsedUser);
     }, [router]);
 
     const handleLogout = () => {
@@ -36,10 +36,22 @@ export default function DashboardPage() {
         router.push('/login');
     };
 
-    const fetchDashboardData = async () => {
+    const fetchDashboardData = async (currentUser?: any) => {
         try {
+            const activeUser = currentUser || user;
+            if (!activeUser) return;
+
+            // Determine query params based on role
+            let queryParams = '?limit=100';
+            if (activeUser.role === 'employee') {
+                queryParams += `&employeeId=${activeUser.employeeId}`;
+            } else if (activeUser.role === 'supervisor') {
+                queryParams += `&supervisorId=${activeUser.employeeId}`;
+            }
+            // Admin sees all (default)
+
             // Fetch alerts from MongoDB
-            const alertsResponse = await fetch('/api/alerts?limit=50');
+            const alertsResponse = await fetch(`/api/alerts${queryParams}`);
             const alertsResult = await alertsResponse.json();
 
             if (alertsResult.success) {
@@ -50,8 +62,7 @@ export default function DashboardPage() {
                 const totalAlerts = alertsData.length;
                 const activeAlerts = alertsData.filter((a: any) => a.alert_status === 'pending').length;
                 const resolvedAlerts = alertsData.filter((a: any) => a.alert_status === 'resolved').length;
-                const violations = alertsData.filter((a: any) => a.is_violation).length;
-                const violationRate = totalAlerts > 0 ? violations / totalAlerts : 0;
+                const resolutionRate = totalAlerts > 0 ? resolvedAlerts / totalAlerts : 0;
 
                 // Top violators
                 const factoryCounts: Record<string, number> = {};
@@ -70,7 +81,7 @@ export default function DashboardPage() {
                     totalAlerts,
                     activeAlerts,
                     resolvedAlerts,
-                    violationRate,
+                    resolutionRate,
                     topViolators,
                 });
             }
@@ -78,6 +89,52 @@ export default function DashboardPage() {
             console.error('Failed to fetch dashboard data:', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleResolve = async (alertId: string) => {
+        const notes = prompt("Enter resolution notes:");
+        if (!notes) return;
+
+        try {
+            const res = await fetch('/api/alerts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'resolve',
+                    id: alertId,
+                    notes: notes
+                })
+            });
+            if (res.ok) {
+                alert("Alert resolved successfully!");
+                fetchDashboardData(); // Refresh list
+            }
+        } catch (error) {
+            console.error("Failed to resolve alert:", error);
+        }
+    };
+
+    const handleReopen = async (alertId: string) => {
+        if (!confirm("Are you sure you want to re-open this alert?")) return;
+
+        try {
+            const res = await fetch('/api/alerts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'reopen',
+                    id: alertId
+                })
+            });
+            if (res.ok) {
+                // No alert needed, just refresh
+                fetchDashboardData();
+            } else {
+                alert("Failed to re-open alert");
+            }
+        } catch (error) {
+            console.error("Failed to re-open alert:", error);
         }
     };
 
@@ -99,10 +156,14 @@ export default function DashboardPage() {
                 <div className="mb-8 flex justify-between items-start">
                     <div>
                         <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
-                            Water Pollution Monitoring Dashboard
+                            {user?.role === 'admin' ? 'Admin Dashboard' :
+                                user?.role === 'supervisor' ? 'Supervisor Dashboard' :
+                                    'Employee Task Board'}
                         </h1>
                         <p className="text-gray-600 dark:text-gray-400">
-                            Real-time monitoring with AI-powered violation detection
+                            {user?.role === 'admin' ? 'System-wide monitoring & employee tracking' :
+                                user?.role === 'supervisor' ? `Monitoring assignments for ${user.fullName}` :
+                                    'Your assigned pollution checks'}
                         </p>
                     </div>
                     {user && (
@@ -112,7 +173,7 @@ export default function DashboardPage() {
                                     {user.fullName || user.username}
                                 </p>
                                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                                    {user.employeeId} • {user.role}
+                                    {user.employeeId} • {user.role.toUpperCase()}
                                 </p>
                             </div>
                             <button
@@ -130,28 +191,28 @@ export default function DashboardPage() {
                     <Card>
                         <CardHeader className="pb-3">
                             <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                                Total Alerts
+                                Total Assigned
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="text-3xl font-bold text-gray-900 dark:text-white">
                                 {stats?.totalAlerts || 0}
                             </div>
-                            <p className="text-xs text-gray-500 mt-1">From MongoDB</p>
+                            <p className="text-xs text-gray-500 mt-1">Total alerts generated</p>
                         </CardContent>
                     </Card>
 
                     <Card>
                         <CardHeader className="pb-3">
                             <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                                Active Alerts
+                                Pending Action
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="text-3xl font-bold text-orange-600 dark:text-orange-400">
                                 {stats?.activeAlerts || 0}
                             </div>
-                            <p className="text-xs text-gray-500 mt-1">Pending action</p>
+                            <p className="text-xs text-gray-500 mt-1">Requires attention</p>
                         </CardContent>
                     </Card>
 
@@ -165,50 +226,37 @@ export default function DashboardPage() {
                             <div className="text-3xl font-bold text-green-600 dark:text-green-400">
                                 {stats?.resolvedAlerts || 0}
                             </div>
-                            <p className="text-xs text-gray-500 mt-1">Completed</p>
+                            <p className="text-xs text-gray-500 mt-1">Successfully handled</p>
                         </CardContent>
                     </Card>
 
                     <Card>
                         <CardHeader className="pb-3">
                             <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                                Violation Rate
+                                Resolution Rate
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="text-3xl font-bold text-red-600 dark:text-red-400">
-                                {((stats?.violationRate || 0) * 100).toFixed(1)}%
+                            <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">
+                                {((stats?.resolutionRate || 0) * 100).toFixed(1)}%
                             </div>
-                            <p className="text-xs text-gray-500 mt-1">AI-detected</p>
+                            <p className="text-xs text-gray-500 mt-1">Alerts resolved</p>
                         </CardContent>
                     </Card>
                 </div>
 
-                {/* AI Sensor Input Form */}
-                <div className="mb-6">
-                    <SensorInputForm
-                        onPrediction={(prediction) => {
-                            // Refresh alerts when new prediction is made
-                            if (prediction.is_violation) {
-                                fetchDashboardData();
-                            }
-                        }}
-                    />
-                </div>
-
-                {/* Recent Alerts */}
+                {/* Recent Alerts Table */}
                 <Card className="mb-6">
                     <CardHeader>
-                        <CardTitle>Recent Alerts (MongoDB)</CardTitle>
+                        <CardTitle>
+                            {user?.role === 'employee' ? 'My Assigned Alerts' : 'Alert Monitoring Log'}
+                        </CardTitle>
                     </CardHeader>
                     <CardContent>
                         {alerts.length === 0 ? (
                             <div className="text-center py-8">
                                 <p className="text-gray-500 dark:text-gray-400">
-                                    No alerts yet. Submit sensor readings to generate alerts.
-                                </p>
-                                <p className="text-sm text-gray-400 dark:text-gray-500 mt-2">
-                                    Use the AI prediction API to analyze water quality data
+                                    No alerts found matching your criteria.
                                 </p>
                             </div>
                         ) : (
@@ -219,46 +267,110 @@ export default function DashboardPage() {
                                             <th className="text-left py-2 px-4 font-medium">Timestamp</th>
                                             <th className="text-left py-2 px-4 font-medium">Factory</th>
                                             <th className="text-left py-2 px-4 font-medium">Type</th>
-                                            <th className="text-left py-2 px-4 font-medium">AI Score</th>
-                                            <th className="text-left py-2 px-4 font-medium">Violation</th>
+                                            <th className="text-left py-2 px-4 font-medium">Severity</th>
                                             <th className="text-left py-2 px-4 font-medium">Status</th>
-                                            <th className="text-left py-2 px-4 font-medium">Assigned To</th>
+                                            {/* Show Assigned To for Admin/Supervisor */}
+                                            {user?.role !== 'employee' && (
+                                                <th className="text-left py-2 px-4 font-medium">Assigned To</th>
+                                            )}
+                                            {/* Show Supervisor for Admin */}
+                                            {user?.role === 'admin' && (
+                                                <th className="text-left py-2 px-4 font-medium">Supervisor</th>
+                                            )}
+                                            <th className="text-left py-2 px-4 font-medium">Action</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {alerts.slice(0, 10).map((alert: any, idx: number) => (
-                                            <tr key={idx} className="border-b hover:bg-gray-50 dark:hover:bg-gray-800">
+                                        {alerts.map((alert: any, idx: number) => (
+                                            <tr key={alert._id || idx} className="border-b hover:bg-gray-50 dark:hover:bg-gray-800">
                                                 <td className="py-3 px-4 text-xs">
                                                     {new Date(alert.timestamp).toLocaleString()}
                                                 </td>
                                                 <td className="py-3 px-4 font-medium">{alert.factory_id}</td>
-                                                <td className="py-3 px-4">{alert.factory_type}</td>
+                                                <td className="py-3 px-4 text-xs">{alert.factory_type}</td>
                                                 <td className="py-3 px-4">
-                                                    <span className="font-mono">{alert.ai_violation_score?.toFixed(3)}</span>
-                                                </td>
-                                                <td className="py-3 px-4">
-                                                    <span
-                                                        className={`px-2 py-1 rounded-full text-xs font-medium ${alert.is_violation
-                                                            ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                                                            : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                                                            }`}
-                                                    >
-                                                        {alert.is_violation ? 'Violation' : 'Compliant'}
+                                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${alert.ai_alert_level === 'CRITICAL' ? 'bg-red-800 text-white' :
+                                                        alert.ai_alert_level === 'SEVERE' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
+                                                            alert.ai_alert_level === 'HIGH' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' :
+                                                                alert.ai_alert_level === 'MODERATE' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
+                                                                    alert.ai_alert_level === 'LOW' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
+                                                                        'bg-gray-100 text-gray-800'
+                                                        }`}>
+                                                        {alert.ai_alert_level || 'DETECTED'}
                                                     </span>
                                                 </td>
                                                 <td className="py-3 px-4">
                                                     <span
                                                         className={`px-2 py-1 rounded-full text-xs font-medium ${alert.alert_status === 'pending'
                                                             ? 'bg-yellow-100 text-yellow-800'
-                                                            : alert.alert_status === 'acknowledged'
-                                                                ? 'bg-blue-100 text-blue-800'
-                                                                : 'bg-green-100 text-green-800'
+                                                            : 'bg-green-100 text-green-800'
                                                             }`}
                                                     >
-                                                        {alert.alert_status}
+                                                        {alert.alert_status.toUpperCase()}
                                                     </span>
                                                 </td>
-                                                <td className="py-3 px-4 text-xs">{alert.assigned_employee_id || '-'}</td>
+
+                                                {/* Assigned To Column */}
+                                                {user?.role !== 'employee' && (
+                                                    <td className="py-3 px-4 text-xs">
+                                                        {alert.assigned_employee_name || alert.assigned_employee_id || 'Unassigned'}
+                                                    </td>
+                                                )}
+
+                                                {/* Supervisor Column (Admin Only) */}
+                                                {user?.role === 'admin' && (
+                                                    <td className="py-3 px-4 text-xs text-gray-500">
+                                                        {alert.supervisor_id === 'SUP-001' ? 'Dr. Meera Iyer' :
+                                                            alert.supervisor_id === 'SUP-002' ? 'Dr. Arun Verma' :
+                                                                alert.supervisor_id || '-'}
+                                                    </td>
+                                                )}
+
+                                                {/* Action Column */}
+                                                <td className="py-3 px-4">
+                                                    {/* Employee Logic */}
+                                                    {user?.role === 'employee' && alert.alert_status === 'pending' && (
+                                                        <button
+                                                            onClick={() => handleResolve(alert._id || alert.id)}
+                                                            className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition"
+                                                        >
+                                                            Resolve
+                                                        </button>
+                                                    )}
+
+                                                    {/* Supervisor Logic */}
+                                                    {user?.role === 'supervisor' && (
+                                                        <div className="flex gap-2">
+                                                            {alert.alert_status === 'pending' && (
+                                                                <button
+                                                                    onClick={() => handleResolve(alert._id || alert.id)}
+                                                                    className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition"
+                                                                >
+                                                                    Resolve
+                                                                </button>
+                                                            )}
+                                                            {alert.alert_status === 'resolved' && (
+                                                                <button
+                                                                    onClick={() => handleReopen(alert._id || alert.id)}
+                                                                    className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white text-xs rounded transition"
+                                                                >
+                                                                    Re-open
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    )}
+
+                                                    {/* Read Only Status (Employee Resolved or Default) */}
+                                                    {alert.alert_status === 'resolved' && user?.role !== 'supervisor' && (
+                                                        <span className="text-gray-500 text-xs">
+                                                            {alert.resolution_notes ? 'Resolved: ' + alert.resolution_notes.substring(0, 15) + '...' : 'Resolved'}
+                                                        </span>
+                                                    )}
+
+                                                    {alert.alert_status !== 'pending' && alert.alert_status !== 'resolved' && (
+                                                        <span className="text-gray-400 text-xs">-</span>
+                                                    )}
+                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>

@@ -9,18 +9,7 @@ export async function GET() {
     try {
         const db = await getDatabase();
 
-        // Check if users already exist
-        const existingUsers = await db.collection(collections.users).countDocuments();
-
-        if (existingUsers > 0) {
-            return NextResponse.json({
-                success: true,
-                message: 'Database already initialized',
-                userCount: existingUsers,
-            });
-        }
-
-        // Create employee accounts
+        // Define all users to ensure are present
         const employees = [
             {
                 username: 'emp001',
@@ -83,6 +72,30 @@ export async function GET() {
                 isActive: true,
             },
             {
+                username: 'emp006',
+                password: await bcrypt.hash('emp006@2024', 10),
+                role: 'employee',
+                employeeId: 'EMP-006',
+                fullName: 'Anjali Gupta',
+                email: 'anjali.gupta@cpcb.gov.in',
+                department: 'Lab Analysis',
+                phone: '+91-9876543217',
+                createdAt: new Date(),
+                isActive: true,
+            },
+            {
+                username: 'emp007',
+                password: await bcrypt.hash('emp007@2024', 10),
+                role: 'employee',
+                employeeId: 'EMP-007',
+                fullName: 'Rohan Das',
+                email: 'rohan.das@cpcb.gov.in',
+                department: 'Field Operations',
+                phone: '+91-9876543218',
+                createdAt: new Date(),
+                isActive: true,
+            },
+            {
                 username: 'supervisor',
                 password: await bcrypt.hash('super@2024', 10),
                 role: 'supervisor',
@@ -91,6 +104,18 @@ export async function GET() {
                 email: 'meera.iyer@cpcb.gov.in',
                 department: 'Quality Control',
                 phone: '+91-9876543215',
+                createdAt: new Date(),
+                isActive: true,
+            },
+            {
+                username: 'supervisor2',
+                password: await bcrypt.hash('super2@2024', 10),
+                role: 'supervisor',
+                employeeId: 'SUP-002',
+                fullName: 'Dr. Arun Verma',
+                email: 'arun.verma@cpcb.gov.in',
+                department: 'Field Compliance',
+                phone: '+91-9876543220',
                 createdAt: new Date(),
                 isActive: true,
             },
@@ -108,29 +133,64 @@ export async function GET() {
             },
         ];
 
-        // Insert employees
-        const result = await db.collection(collections.users).insertMany(employees);
+        // Define hierarchy mapping
+        const supervisorMapping: Record<string, string> = {
+            'emp001': 'SUP-001',
+            'emp002': 'SUP-001',
+            'emp003': 'SUP-001',
+            'emp004': 'SUP-001',
+            'emp005': 'SUP-002',
+            'emp006': 'SUP-002',
+            'emp007': 'SUP-002',
+        };
 
-        // Create indexes
-        await db.collection(collections.users).createIndex({ username: 1 }, { unique: true });
-        await db.collection(collections.users).createIndex({ employeeId: 1 }, { unique: true });
-        await db.collection(collections.users).createIndex({ email: 1 }, { unique: true });
+        let createdCount = 0;
+        let updatedCount = 0;
+        const createdUsers = [];
 
-        await db.collection(collections.alerts).createIndex({ timestamp: -1 });
-        await db.collection(collections.alerts).createIndex({ factory_id: 1 });
-        await db.collection(collections.alerts).createIndex({ alert_status: 1 });
-        await db.collection(collections.alerts).createIndex({ assigned_employee_id: 1 });
+        for (const emp of employees) {
+            const exists = await db.collection(collections.users).findOne({ username: emp.username });
+
+            // Add supervisorId if applicable
+            if (emp.role === 'employee' && supervisorMapping[emp.username]) {
+                (emp as any).supervisorId = supervisorMapping[emp.username];
+            }
+
+            if (!exists) {
+                await db.collection(collections.users).insertOne(emp);
+                createdCount++;
+                createdUsers.push(emp.username);
+            } else {
+                // Update existing user with new supervisorId if needed
+                if ((emp as any).supervisorId) {
+                    await db.collection(collections.users).updateOne(
+                        { username: emp.username },
+                        { $set: { supervisorId: (emp as any).supervisorId } }
+                    );
+                    updatedCount++;
+                }
+            }
+        }
+
+        // Create indexes (safe to run multiple times, usually)
+        if (createdCount > 0) {
+            await db.collection(collections.users).createIndex({ username: 1 }, { unique: true });
+            await db.collection(collections.users).createIndex({ employeeId: 1 }, { unique: true });
+            await db.collection(collections.users).createIndex({ email: 1 }, { unique: true });
+
+            // Alert indexes
+            await db.collection(collections.alerts).createIndex({ timestamp: -1 });
+            await db.collection(collections.alerts).createIndex({ factory_id: 1 });
+            await db.collection(collections.alerts).createIndex({ alert_status: 1 });
+            await db.collection(collections.alerts).createIndex({ assigned_employee_id: 1 });
+        }
 
         return NextResponse.json({
             success: true,
-            message: 'Database initialized successfully',
-            employeesCreated: result.insertedCount,
-            employees: employees.map(e => ({
-                username: e.username,
-                employeeId: e.employeeId,
-                fullName: e.fullName,
-                role: e.role,
-            })),
+            message: createdCount > 0 ? 'New users added to database' : 'Database already up to date',
+            newUsersCount: createdCount,
+            newUsers: createdUsers,
+            totalUsers: await db.collection(collections.users).countDocuments()
         });
     } catch (error: any) {
         console.error('Database initialization error:', error);

@@ -72,12 +72,16 @@ export default function SensorInputForm({ onPrediction }: SensorFormProps) {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    ...formData,
-                    is_violation: predictionData.is_violation,
-                    violation_reason: predictionData.violation_reasons.join('|'),
-                    ai_violation_score: predictionData.violation_probability,
-                    alert_status: 'pending',
-                    assigned_employee_id: 'EMP-001', // From logged-in user
+                    action: 'create',
+                    alert_data: {
+                        ...formData,
+                        is_violation: predictionData.is_violation,
+                        violation_reason: predictionData.violation_reasons.join('|'),
+                        ai_violation_score: predictionData.violation_probability,
+                        ai_alert_level: predictionData.alert_level.toUpperCase(), // Ensure alert level is passed
+                        alert_status: 'pending',
+                        // Assigned employee handled by backend (Random Assignment)
+                    }
                 }),
             });
         } catch (err) {
@@ -268,17 +272,17 @@ export default function SensorInputForm({ onPrediction }: SensorFormProps) {
                     {/* Prediction Result */}
                     {prediction && (
                         <div className={`p-4 rounded-lg border-2 ${prediction.is_violation
-                                ? 'bg-red-50 border-red-500 dark:bg-red-900/20'
-                                : 'bg-green-50 border-green-500 dark:bg-green-900/20'
+                            ? 'bg-red-50 border-red-500 dark:bg-red-900/20'
+                            : 'bg-green-50 border-green-500 dark:bg-green-900/20'
                             }`}>
                             <div className="flex items-center justify-between mb-3">
                                 <h3 className="text-lg font-bold">
                                     {prediction.is_violation ? '⚠️ VIOLATION DETECTED' : '✅ COMPLIANT'}
                                 </h3>
                                 <span className={`px-3 py-1 rounded-full text-sm font-bold ${prediction.alert_level === 'critical' ? 'bg-red-600 text-white' :
-                                        prediction.alert_level === 'high' ? 'bg-orange-600 text-white' :
-                                            prediction.alert_level === 'medium' ? 'bg-yellow-600 text-white' :
-                                                'bg-green-600 text-white'
+                                    prediction.alert_level === 'high' ? 'bg-orange-600 text-white' :
+                                        prediction.alert_level === 'medium' ? 'bg-yellow-600 text-white' :
+                                            'bg-green-600 text-white'
                                     }`}>
                                     {prediction.alert_level.toUpperCase()}
                                 </span>
